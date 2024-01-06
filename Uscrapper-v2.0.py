@@ -1,18 +1,20 @@
+import argparse
+import random
+import re
+import signal
+from collections import OrderedDict
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
+from urllib.parse import urlparse, urljoin
+
 import requests
 from bs4 import BeautifulSoup
-import random
-import argparse
-import re
 from termcolor import colored
-from urllib.parse import urlparse, urljoin
-from concurrent.futures import ThreadPoolExecutor
-from collections import OrderedDict
 from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
 from webdriver_manager.firefox import GeckoDriverManager
 from selenium.webdriver.firefox.service import Service as FirefoxService
-import signal
-from datetime import datetime
+
 
 print("\n")
 print(colored("   █░█","blue"),colored("█▀ █▀▀ █▀█ ▄▀█ █▀█ █▀█ █▀▀ █▀█  ","white",attrs=['bold']))
@@ -47,17 +49,21 @@ def handler(signum, frame):
         exit(1)
 
 def selenium_wd(url):
-
     global counter
     global driver
+
     options = Options()
     options.add_argument('-headless')
-    if counter == 0:
+
+    # Check if the driver is an instance of a webdriver, and create it if not
+    if not isinstance(driver, webdriver.Firefox):
         driver = webdriver.Firefox(options=options)
         counter = 1
+
     driver.get(url)
     source = driver.page_source
     return source
+
 
 def get_links_from_page(url):
 
@@ -103,7 +109,7 @@ def get_links_from_page(url):
 
 def web_crawler(start_url, max_pages=10, num_threads=4):
 
-    if num_threads == None:
+    if num_threads is None:
        num_threads = 4
     visited_links = set()
     queue = [start_url]
@@ -116,7 +122,7 @@ def web_crawler(start_url, max_pages=10, num_threads=4):
         print(f"Crawling: {url}")
         link_list += url
         link_list += "\n"
-        extract_details(url, args.generate_report, args.nonstrict)
+        extract_details(url, args.nonstrict)
         links_on_page = get_links_from_page(url)
         visited_links.add(url)
         return links_on_page
@@ -135,7 +141,7 @@ def web_crawler(start_url, max_pages=10, num_threads=4):
     print("Crawling finished.")
 
 
-def extract_details(url, generate_report, non_strict):
+def extract_details(url, non_strict):
 
     user_agents_list = [
     'Mozilla/5.0 (iPad; CPU OS 12_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148',
@@ -153,12 +159,12 @@ def extract_details(url, generate_report, non_strict):
 
     usernames = []
     if non_strict:
-        usernames = set(username.string for username in soup.find_all('a', href=True, string=re.compile(r'^[^\s]+$')))
+        usernames = {username.string for username in soup.find_all('a', href=True, string=re.compile(r'^[^\s]+$'))}
+    email_addresses = {email['href'].replace('mailto:', '') for email in soup.find_all('a', href=lambda href: href and 'mailto:' in href)}
+    social_links = {link['href'] for link in soup.find_all('a', href=True)}
+    author_names = {author['content'] for author in soup.find_all('meta', attrs={'name': 'author'})}
+    geolocations = {location['content'] for location in soup.find_all('meta', attrs={'name': 'geo.position'})}
 
-    email_addresses = set(email['href'].replace('mailto:', '') for email in soup.find_all('a', href=lambda href: href and 'mailto:' in href))
-    social_links = set(link['href'] for link in soup.find_all('a', href=True))
-    author_names = set(author['content'] for author in soup.find_all('meta', attrs={'name': 'author'}))
-    geolocations = set(location['content'] for location in soup.find_all('meta', attrs={'name': 'geo.position'}))
 
     webpage_text = soup.get_text()
 
@@ -362,7 +368,7 @@ if __name__ == '__main__':
                  if args.crawl:
                      web_crawler(url, args.crawl, args.threads)
                      printlist()
-                 extract_details(url, args.generate_report, args.nonstrict)
+                 extract_details(url, args.nonstrict)
                  printlist()
                  generate_report()
 
@@ -371,7 +377,7 @@ if __name__ == '__main__':
                 print(colored("[+] Trying to bypass...","green"))
                 if args.crawl:
                     web_crawler(url, args.crawl, args.threads)
-                extract_details(url, args.generate_report, args.nonstrict)
+                extract_details(url, args.nonstrict)
                 printlist()
 
              else:
